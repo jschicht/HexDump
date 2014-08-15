@@ -1,16 +1,16 @@
 #Region ;**** Directives created by AutoIt3Wrapper_GUI ****
 #AutoIt3Wrapper_Change2CUI=y
-#AutoIt3Wrapper_Res_Fileversion=1.0.0.0
+#AutoIt3Wrapper_Res_Fileversion=1.0.0.1
 #AutoIt3Wrapper_Res_requestedExecutionLevel=asInvoker
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 #Include <WinAPI.au3>
-Dim $nBytes
+Dim $nBytes, $FileFound=0
 If $cmdline[0] <> 3 Then
 	ConsoleWrite("Usage:" & @CRLF)
 	ConsoleWrite("HexDump InputFilename Filepos Numbytes" & @CRLF)
 	ConsoleWrite("-InputFilename can be a filename or volume/disk path" & @CRLF)
 	ConsoleWrite("-Filepos and numbytes can be in decimal or hex" & @CRLF)
-	ConsoleWrite("-Numbytes of 0 will resolve to filesize" & @CRLF)
+	ConsoleWrite("-Numbytes of 0 will resolve to filesize unless InputFilename is of type volume or disk" & @CRLF)
 	ConsoleWrite(@CRLF)
 	ConsoleWrite("Examples:" & @CRLF)
 	ConsoleWrite("HexDump D:\diskimage.img 0x2800 0x200" & @CRLF)
@@ -18,28 +18,76 @@ If $cmdline[0] <> 3 Then
 	ConsoleWrite("HexDump PhysicalDrive1 0x0 0x200" & @CRLF)
 	Exit
 EndIf
+$sDevice = $cmdline[1]
+$FilePos = $cmdline[2]
+$NumBytes = $cmdline[3]
+;If StringInStr($cmdline[1],"PhysicalDrive") Or (StringRight($cmdline[1],":") And StringLen($cmdline[1]) = 2)
 If StringInStr($cmdline[1],"PhysicalDrive")=0 And (StringInStr($cmdline[1],":\")>0 And StringLen($cmdline[1]) > 3) Then
 	If Not FileExists($cmdline[1]) Then
 		ConsoleWrite("Error: File not found" & @CRLF)
 		Exit
 	EndIf
 EndIf
-$FilePos = $cmdline[2]
-$FilePos = StringReplace($FilePos,"0x","")
-$NumBytes = $cmdline[3]
-$NumBytes = StringReplace($NumBytes,"0x","")
-If StringIsDigit($NumBytes)=0 And StringIsXDigit($NumBytes)=0 Then
-	ConsoleWrite("Error: Number of bytes must be in deciaml or hexadecimal" & @CRLF)
-	Exit
+If FileExists($cmdline[1]) Then $FileFound=1
+If StringLeft($FilePos,2) = "0x" Then
+	$FilePos = StringReplace($FilePos,"0x","")
+;	If Not StringIsXDigit($FilePos) Then
+;		ConsoleWrite("Error: File offset must be in deciaml or hexadecimal" & @CRLF)
+;		Exit
+;	EndIf
+	$FilePos = Dec($FilePos,2)
+Else
+	If Not StringIsDigit($FilePos) Then
+		ConsoleWrite("Error: File offset must be in deciaml or hexadecimal" & @CRLF)
+		Exit
+	EndIf
 EndIf
-If StringIsDigit($FilePos)=0 And StringIsXDigit($FilePos)=0 Then
-	ConsoleWrite("Error: File offset must be in deciaml or hexadecimal" & @CRLF)
-	Exit
+;$NumBytes = $cmdline[3]
+If StringLeft($NumBytes,2) = "0x" Then
+	$NumBytes = StringReplace($NumBytes,"0x","")
+	If Not StringIsXDigit($NumBytes) Then
+		ConsoleWrite("Error: Number of bytes must be in deciaml or hexadecimal" & @CRLF)
+		Exit
+	EndIf
+	$NumBytes = Dec($NumBytes,2)
+Else
+	If Not StringIsDigit($NumBytes) Then
+		ConsoleWrite("Error: Number of bytes must be in deciaml or hexadecimal" & @CRLF)
+		Exit
+	EndIf
 EndIf
-If StringIsXDigit($FilePos) Then $FilePos = Dec($FilePos,2)
-If StringIsXDigit($NumBytes) Then $NumBytes = Dec($NumBytes,2)
-If $NumBytes = 0 Then $NumBytes = FileGetSize($cmdline[1])
+
+ConsoleWrite("$FileFound: " & $FileFound & @CRLF)
+ConsoleWrite("$FilePos: " & $FilePos & @CRLF)
+ConsoleWrite("$NumBytes: " & $NumBytes & @CRLF)
+
+If $FileFound And StringLen($cmdline[1]) > 3 Then
+	$NumBytes = FileGetSize($cmdline[1])
+Else ; We assume a device or volume
+	$Counter=0
+	If Mod($FilePos,512) And $FilePos>0 Then
+		Do
+			$Counter+=1
+			$FilePos+=1
+		Until Mod($FilePos,512)=0
+		$FilePos -= 512
+		ConsoleWrite("Offset corrected from: 0x" & Hex(Int($FilePos+(512-$Counter))) & " to: 0x" & Hex(Int($FilePos)) & @CRLF)
+	EndIf
+	$Counter=0
+	If Mod($NumBytes,512) Then
+		Do
+			$Counter+=1
+			$NumBytes+=1
+		Until Mod($NumBytes,512)=0
+		;$NumBytes -= 512
+		ConsoleWrite("NumBytes corrected from: 0x" & Hex(Int(512-$Counter)) & " to: 0x" & Hex(Int($NumBytes)) & @CRLF)
+	EndIf
+EndIf
+
+;ConsoleWrite("$FilePos: " & $FilePos & @CRLF)
+;ConsoleWrite("$NumBytes: " & $NumBytes & @CRLF)
 $tBuffer = DllStructCreate("byte[" & $NumBytes & "]")
+;ConsoleWrite("DllStructCreate: " & @error & @CRLF)
 $hFile = _WinAPI_CreateFile("\\.\" & $cmdline[1], 2, 2, 6)
 If $hFile = 0 Then
 	ConsoleWrite("Error in function CreateFile: " & _WinAPI_GetLastErrorMessage() & @CRLF)
@@ -47,12 +95,13 @@ If $hFile = 0 Then
 	Exit
 EndIf
 _WinAPI_SetFilePointerEx($hFile, $FilePos, $FILE_BEGIN)
-_WinAPI_ReadFile($hFile, DllStructGetPtr($tBuffer), $NumBytes, $nBytes)
+$read = _WinAPI_ReadFile($hFile, DllStructGetPtr($tBuffer), $NumBytes, $nBytes)
+;ConsoleWrite("$read: " & $read & @CRLF)
 $rData = DllStructGetData($tBuffer,1)
-$OutPut = _HexEncode($rData)
+;ConsoleWrite("DllStructGetData: " & @error & @CRLF)
 If Not @error Then
 	ConsoleWrite("Hexdump of: " & $cmdline[1] & @CRLF)
-	ConsoleWrite($OutPut)
+	ConsoleWrite(_HexEncode($rData) & @CRLF)
 Else
 	ConsoleWrite("Error: Dumping of file failed" & @CRLF)
 EndIf

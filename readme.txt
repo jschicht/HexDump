@@ -4,7 +4,7 @@ Usage:
 HexDump InputFilename Filepos Numbytes
 -InputFilename can be a filename or volume/disk path
 -Filepos and numbytes can be in decimal or hex
--Numbytes of 0 will resolve to filesize
+-Numbytes of 0 will resolve to filesize unless InputFilename is of type volume or disk
 
 Examples:
 HexDump D:\diskimage.img 0x2800 0x200
