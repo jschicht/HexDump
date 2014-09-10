@@ -1,21 +1,23 @@
 #Region ;**** Directives created by AutoIt3Wrapper_GUI ****
 #AutoIt3Wrapper_Change2CUI=y
-#AutoIt3Wrapper_Res_Fileversion=1.0.0.1
+#AutoIt3Wrapper_Res_Fileversion=1.0.0.2
 #AutoIt3Wrapper_Res_requestedExecutionLevel=asInvoker
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 #Include <WinAPI.au3>
 Dim $nBytes, $FileFound=0
-If $cmdline[0] <> 3 Then
+If $cmdline[0] < 3 Then
 	ConsoleWrite("Usage:" & @CRLF)
 	ConsoleWrite("HexDump InputFilename Filepos Numbytes" & @CRLF)
 	ConsoleWrite("-InputFilename can be a filename or volume/disk path" & @CRLF)
 	ConsoleWrite("-Filepos and numbytes can be in decimal or hex" & @CRLF)
 	ConsoleWrite("-Numbytes of 0 will resolve to filesize unless InputFilename is of type volume or disk" & @CRLF)
+	ConsoleWrite("-w will write out the data chunk to the current directory" & @CRLF)
 	ConsoleWrite(@CRLF)
 	ConsoleWrite("Examples:" & @CRLF)
 	ConsoleWrite("HexDump D:\diskimage.img 0x2800 0x200" & @CRLF)
 	ConsoleWrite("HexDump C: 0x0 0x200" & @CRLF)
 	ConsoleWrite("HexDump PhysicalDrive1 0x0 0x200" & @CRLF)
+	ConsoleWrite("HexDump PhysicalDrive1 0x10010 0x200 -w" & @CRLF)
 	Exit
 EndIf
 $sDevice = $cmdline[1]
@@ -57,11 +59,11 @@ Else
 	EndIf
 EndIf
 
-ConsoleWrite("$FileFound: " & $FileFound & @CRLF)
-ConsoleWrite("$FilePos: " & $FilePos & @CRLF)
-ConsoleWrite("$NumBytes: " & $NumBytes & @CRLF)
+;ConsoleWrite("$FileFound: " & $FileFound & @CRLF)
+;ConsoleWrite("$FilePos: " & $FilePos & @CRLF)
+;ConsoleWrite("$NumBytes: " & $NumBytes & @CRLF)
 
-If $FileFound And StringLen($cmdline[1]) > 3 Then
+If $FileFound And StringLen($cmdline[1]) > 3 And $NumBytes = 0 Then
 	$NumBytes = FileGetSize($cmdline[1])
 Else ; We assume a device or volume
 	$Counter=0
@@ -91,12 +93,13 @@ $tBuffer = DllStructCreate("byte[" & $NumBytes & "]")
 $hFile = _WinAPI_CreateFile("\\.\" & $cmdline[1], 2, 2, 6)
 If $hFile = 0 Then
 	ConsoleWrite("Error in function CreateFile: " & _WinAPI_GetLastErrorMessage() & @CRLF)
-	_WinAPI_CloseHandle($hFile)
 	Exit
 EndIf
 _WinAPI_SetFilePointerEx($hFile, $FilePos, $FILE_BEGIN)
-$read = _WinAPI_ReadFile($hFile, DllStructGetPtr($tBuffer), $NumBytes, $nBytes)
-;ConsoleWrite("$read: " & $read & @CRLF)
+If Not _WinAPI_ReadFile($hFile, DllStructGetPtr($tBuffer), $NumBytes, $nBytes) Then
+	ConsoleWrite("Error in ReadFile: " & _WinAPI_CloseHandle($hFile) & @CRLF)
+	Exit
+EndIf
 $rData = DllStructGetData($tBuffer,1)
 ;ConsoleWrite("DllStructGetData: " & @error & @CRLF)
 If Not @error Then
@@ -105,6 +108,22 @@ If Not @error Then
 Else
 	ConsoleWrite("Error: Dumping of file failed" & @CRLF)
 EndIf
+
+If $cmdline[0] = 4 Then
+;	ConsoleWrite("Writing dump" & @CRLF)
+;	$OutFile = $cmdline[0] & "_offset_0x" & Hex($FilePos,8) & ".bin"
+	$OutFile = @ScriptDir & "\Dump_offset_0x" & Hex($FilePos,8) & ".bin"
+	$hDump = _WinAPI_CreateFile("\\.\" & $OutFile, 1, 6, 6)
+;	ConsoleWrite("Error in function CreateFile: " & _WinAPI_GetLastErrorMessage() & @CRLF)
+	If _WinAPI_WriteFile($hDump, DllStructGetPtr($tBuffer), DllStructGetSize($tBuffer), $nBytes) Then
+		ConsoleWrite("Success writing output" & @CRLF)
+	Else
+		ConsoleWrite("Error writing output: " & _WinAPI_GetLastErrorMessage() & @CRLF)
+	EndIf
+	_WinAPI_CloseHandle($hDump)
+EndIf
+
+_WinAPI_CloseHandle($hFile)
 
 Func _WinAPI_SetFilePointerEx($hFile, $iPos, $iMethod = 0)
 	Local $Ret = DllCall('kernel32.dll', 'int', 'SetFilePointerEx', 'ptr', $hFile, 'int64', $iPos, 'int64*', 0, 'dword', $iMethod)
