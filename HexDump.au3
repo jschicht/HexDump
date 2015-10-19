@@ -1,6 +1,8 @@
 #Region ;**** Directives created by AutoIt3Wrapper_GUI ****
+#AutoIt3Wrapper_Icon=..\..\..\Program Files (x86)\autoit-v3.3.14.2\Icons\au3.ico
+#AutoIt3Wrapper_UseUpx=y
 #AutoIt3Wrapper_Change2CUI=y
-#AutoIt3Wrapper_Res_Fileversion=1.0.0.2
+#AutoIt3Wrapper_Res_Fileversion=1.0.0.3
 #AutoIt3Wrapper_Res_requestedExecutionLevel=asInvoker
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 #Include <WinAPI.au3>
@@ -112,7 +114,7 @@ EndIf
 If $cmdline[0] = 4 Then
 ;	ConsoleWrite("Writing dump" & @CRLF)
 ;	$OutFile = $cmdline[0] & "_offset_0x" & Hex($FilePos,8) & ".bin"
-	$OutFile = @ScriptDir & "\Dump_offset_0x" & Hex($FilePos,8) & ".bin"
+	$OutFile = @ScriptDir & "\Dump_offset_0x" & Hex($FilePos,16) & ".bin"
 	$hDump = _WinAPI_CreateFile("\\.\" & $OutFile, 1, 6, 6)
 ;	ConsoleWrite("Error in function CreateFile: " & _WinAPI_GetLastErrorMessage() & @CRLF)
 	If _WinAPI_WriteFile($hDump, DllStructGetPtr($tBuffer), DllStructGetSize($tBuffer), $nBytes) Then
