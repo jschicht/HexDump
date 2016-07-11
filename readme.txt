@@ -9,6 +9,6 @@ HexDump InputFilename Filepos Numbytes
 
 Examples:
 HexDump D:\diskimage.img 0x2800 0x200
-HexDump C: 0x0 0x200
+HexDump C: 0 0x200
 HexDump PhysicalDrive1 0x0 0x200
 HexDump PhysicalDrive1 0x10010 0x200 -w
