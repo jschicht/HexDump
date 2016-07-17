@@ -2,7 +2,7 @@
 #AutoIt3Wrapper_Icon=..\..\..\Program Files (x86)\autoit-v3.3.14.2\Icons\au3.ico
 #AutoIt3Wrapper_UseUpx=y
 #AutoIt3Wrapper_Change2CUI=y
-#AutoIt3Wrapper_Res_Fileversion=1.0.0.4
+#AutoIt3Wrapper_Res_Fileversion=1.0.0.5
 #AutoIt3Wrapper_Res_requestedExecutionLevel=asInvoker
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 #Include <WinAPI.au3>
@@ -70,9 +70,9 @@ EndIf
 ;ConsoleWrite("$FilePos: " & $FilePos & @CRLF)
 ;ConsoleWrite("$NumBytes: " & $NumBytes & @CRLF)
 
-If $FileFound And StringLen($cmdline[1]) > 3 And $NumBytes = 0 Then
+If ($FileFound And StringLen($cmdline[1]) > 3 And $NumBytes = 0) Then
 	$NumBytes = FileGetSize($cmdline[1])
-Else ; We assume a device or volume
+ElseIf ($FileFound = 0 Or StringLen($cmdline[1]) < 4) Then ; We assume a device or volume
 	$Counter=0
 	If Mod($FilePos,512) And $FilePos>0 Then
 		Do
